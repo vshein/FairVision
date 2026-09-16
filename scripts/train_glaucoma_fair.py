@@ -33,6 +33,11 @@ import timm
 from transformers import VideoMAEForVideoClassification, VivitForVideoClassification
 
 import warnings
+
+# Folder holding the optional pre-trained checkpoints used by
+# --vit_weights {mae,mocov3,mae_chest_xray,mae_color_fundus}.  Override it with
+# the MODELHUB_DIR environment variable if the files live elsewhere.
+MODELHUB_DIR = os.environ.get('MODELHUB_DIR', "/scratch/mok232/Fairness_in_Eye_Disease_Screening/MODELHUB")
 warnings.filterwarnings("ignore")
 
 class Dataset_Info(NamedTuple):
@@ -415,13 +420,13 @@ if __name__ == '__main__':
                     del imagenet_init_model
                 else:
                     if args.vit_weights == 'mae':
-                        checkpoint_path = "/scratch/mok232/Fairness_in_Eye_Disease_Screening/MODELHUB/mae_pretrain_vit_base.pth"
+                        checkpoint_path = f"{MODELHUB_DIR}/mae_pretrain_vit_base.pth"
                     elif args.vit_weights == 'mocov3':
-                        checkpoint_path = "/scratch/mok232/Fairness_in_Eye_Disease_Screening/MODELHUB/mocov3_pretrain_vit_base.pth"
+                        checkpoint_path = f"{MODELHUB_DIR}/mocov3_pretrain_vit_base.pth"
                     elif args.vit_weights == 'mae_chest_xray':
-                        checkpoint_path = "/scratch/mok232/Fairness_in_Eye_Disease_Screening/MODELHUB/vit-b_CXR_0.5M_mae.pth"
+                        checkpoint_path = f"{MODELHUB_DIR}/vit-b_CXR_0.5M_mae.pth"
                     elif args.vit_weights == 'mae_color_fundus':
-                        checkpoint_path = "/scratch/mok232/Fairness_in_Eye_Disease_Screening/MODELHUB/RETFound_cfp_weights.pth"
+                        checkpoint_path = f"{MODELHUB_DIR}/RETFound_cfp_weights.pth"
                     
                     checkpoint = torch.load(checkpoint_path, map_location='cpu')
                     print("Load pre-trained checkpoint from: %s" % checkpoint_path)

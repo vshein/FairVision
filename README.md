@@ -28,8 +28,10 @@ DATASET_DIR=/path/to/FairVision ./scripts/train_dr_vit.sh
 ```
 
 Never edit a path inside the scripts. `DATASET_DIR` (dataset) and `RESULT_DIR`
-(outputs) are the only two knobs, and both have sensible defaults — see
-[§1.4](#14-point-the-code-at-the-data) for all the supported layouts.
+(outputs) are the only two knobs you should ever need — both have sensible
+defaults — and there is a third one, `MODELHUB_DIR`, only for the optional
+`--vit_weights mae/mocov3/...` checkpoints. See
+[§1.4](#14-point-the-code-at-the-data) for all the supported data layouts.
 
 ## Dataset
 
@@ -448,7 +450,7 @@ of the `train_dr_*.sh` scripts and replace `DR` with `Glaucoma` and
 | `FileNotFoundError: .../DR/train` | The archive was not extracted yet — run `./scripts/prepare_data.sh DR`. |
 | `CUDA out of memory` | Lower `--batch_size` (ViT-B) or `--fair_scaling_batchsize` (3D / FIS). |
 | Downloading the ImageNet weights fails | Use `--vit_weights scratch`, or run once on a machine with internet access (timm caches the weights in `~/.cache/huggingface/`). |
-| `--vit_weights mae / mocov3 / mae_chest_xray / mae_color_fundus` fails | Those options expect pre-trained checkpoints under `/scratch/mok232/...` (see `scripts/train_dr_fair.py`). Download the checkpoints and update the paths, or use `imagenet` / `scratch`. |
+| `--vit_weights mae / mocov3 / mae_chest_xray / mae_color_fundus` fails | Those options expect pre-trained checkpoints in the authors' model hub folder. Put the `.pth` files in a folder of your own and point the code at it with the `MODELHUB_DIR` environment variable: `MODELHUB_DIR=/path/to/MODELHUB ./scripts/train_dr_vit.sh` (defaults to the original `/scratch/mok232/...` path, so nothing breaks if you never use these options). Alternatively use `imagenet` or `scratch`. |
 | `ImportError` / `ModuleNotFoundError` for a package | Re-run `pip install -r requirements.txt` and check that you run the scripts with the same interpreter (`python -c "import <package>"`). |
 | Training is extremely slow | Check `python -c "import torch; print(torch.cuda.is_available())"`. If it prints `False`, no GPU is visible and everything runs on the CPU. |
 | `unzip: command not found` | Use `python -m zipfile -e <archive> <target>` instead, or install `unzip` without `sudo` via `conda install -c conda-forge unzip`. |
