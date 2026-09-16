@@ -100,42 +100,276 @@ We put all the attributes associated with the 10,000 samples in a meta csv file 
 
 Equity in AI for healthcare is crucial due to its direct impact on human well-being. Despite advancements in 2D medical imaging fairness, the fairness of 3D models remains underexplored, hindered by the small sizes of 3D fairness datasets. Since 3D imaging surpasses 2D imaging in SOTA clinical care, it is critical to understand the fairness of these 3D models. To address this research gap, we conduct the first comprehensive study on the fairness of 3D medical imaging models across multiple protected attributes. Our investigation spans both 2D and 3D models and evaluates fairness across five architectures on three common eye diseases, revealing significant biases across race, gender, and ethnicity. To alleviate these biases, we propose a novel fair identity scaling (FIS) method that improves both overall performance and fairness, outperforming various SOTA fairness methods. Moreover, we release Harvard-FairVision, the first large-scale medical fairness dataset with 30,000 subjects featuring both 2D and 3D imaging data and six demographic identity attributes. Harvard-FairVision provides labels for three major eye disorders affecting about 380 million people worldwide, serving as a valuable resource for both 2D and 3D fairness learning.
 
-## Requirements
+## Table of contents
 
-To install the prerequisites, run:
+1. [Environment setup](#1-environment-setup)
+2. [Preparing the data](#2-preparing-the-data)
+3. [Experiments (step by step)](#3-experiments)
+4. [Troubleshooting](#4-troubleshooting)
+5. [Acknowledgment and Citation](#acknowledgment-and-citation)
 
-```
+---
+
+## 1. Environment setup
+
+### 1.1 What you need
+
+* Linux (the experiment scripts are `bash`); macOS works as well.
+* Python 3.10+ — this checkout was validated with Python 3.13.
+* Free disk space: ~55 GB per disease for the extracted data (~40 GB of archives
+  in the Hugging Face cache) plus room for checkpoints and logs.
+* A CUDA GPU is strongly recommended (the experiments train ViT-B and 3D ResNet
+  models). The code also runs on CPU — `torch.cuda.is_available()` simply returns
+  `False` and everything is executed on the CPU, only much slower.
+
+> **No `sudo` is required for any step.** All Python packages are installed into
+> your own environment and all extracted data, checkpoints and logs are written
+> to folders you own.
+
+### 1.2 Install the dependencies
+
+From the repository root:
+
+```bash
 pip install -r requirements.txt
 ```
 
-## Experiments
+`requirements.txt` lists every third-party package the repository imports:
+`numpy`, `scipy`, `pandas`, `Pillow`, `blobfile`, `scikit-image`,
+`opencv-python`, `einops`, `torch`, `torchvision`, `timm`, `transformers`,
+`scikit-learn`, `fairlearn` and `geomloss`.
 
-To run the experiments with the baseline models (e.g., ViT) on the task of AMD detection with SLO fundus images, execute:
+If you prefer an isolated environment:
 
-```
-./scripts/train_amd_vit.sh
-```
-
-To run the experiments with the baseline models (e.g., ViT) with the proposed FIS on the task of AMD detection with SLO fundus images, execute:
-
-```
-./scripts/train_amd_vit_fis.sh
-```
-
-To run the experiments with 3D ResNet on the task of AMD detection with OCT B-Scans, execute:
-
-```
-./scripts/train_amd_3d.sh
+```bash
+python -m venv .venv && source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-To run the experiments with 3D ResNet with the proposed FIS on the task of AMD detection with OCT B-Scans, execute:
+**GPU / CPU note.** A plain `pip install torch` downloads the CUDA build (several
+GB of `nvidia-*` wheels). On a machine without a GPU you can avoid that with:
 
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
 ```
-./scripts/train_amd_3d_fis.sh
+
+### 1.3 Verify the installation
+
+```bash
+python -c "import torch, torchvision, timm, transformers, blobfile, einops, cv2, skimage, sklearn, fairlearn, geomloss; print('all dependencies OK')"
 ```
 
-To run the experiments on the tasks of DR and Glaucoma detection, you can edit the aforementioned scripts by changing the dataset directory (e.g., FairVision/AMD -> FairVision/DR) and the python file (e.g., train_amd_fair.py/train_amd_fair_fis.py/train_amd_fair_3d.py/train_amd_fair_3d_fis.py -> train_dr_fair.py/train_dr_fair_fis.py/train_dr_fair_3d.py/train_dr_fair_3d_fis.py).
+The experiments themselves are started with the same interpreter that printed
+`all dependencies OK`.
 
+### 1.4 Point the code at the data
+
+Every script in `scripts/` reads the dataset root from the `DATASET_DIR`
+environment variable. The default used in this checkout is
+
+```text
+/home/jupyter-vshein/data/harvard/FairVision/
+```
+
+and can be overridden per run (keep the trailing slash):
+
+```bash
+DATASET_DIR=/path/to/FairVision/ ./scripts/train_dr_vit.sh
+```
+
+### 1.5 Compatibility notes for this checkout
+
+Three small fixes were needed so that the (2024) code base runs with the current
+PyTorch/timm releases — all of them are already applied in this repository:
+
+1. `scripts/models_vit.py` — the vendored MAE `VisionTransformer` inherits the
+   modern timm class, whose `forward()` calls `forward_head()`, pooling and
+   normalising the features a second time. An explicit
+   `forward()` (features → head) was added, matching the original
+   MAE/timm-0.5 behaviour.
+2. `requirements.txt` — `timm` is pinned to `>=0.9.3,<1.0.0` (the API the
+   repository was written against; the deprecated `timm.models.layers` import is
+   still available there).
+3. All `scripts/train_*.py` — `torch.cuda.synchronize()` is now wrapped in
+   `if torch.cuda.is_available():` and the hard-coded `.cuda()` calls use the
+   `device` variable, so the code also runs (slowly) on a CPU-only machine.
+
+---
+
+## 2. Preparing the data
+
+### 2.1 Where the dataset lives
+
+The dataset is published on Hugging Face as
+[`harvardairobotics/FairVision`](https://huggingface.co/datasets/harvardairobotics/FairVision).
+On this machine it is already downloaded into the Hugging Face cache:
+
+```text
+/home/jupyter-kl3nguye/.cache/huggingface/hub/datasets--harvardairobotics--FairVision/
+└── snapshots/<revision>/
+    ├── AMD/
+    │   ├── Dataset/dataset.zip          # ~40 GB archive: NPZ files + SLO jpgs
+    │   └── ReadMe/{data_description_amd.txt, data_summary_amd.csv}
+    ├── DR/
+    │   ├── Dataset/dataset.zip
+    │   └── ReadMe/{data_description_dr.txt, data_summary_dr.csv}
+    └── Glaucoma/
+        ├── Dataset/dataset.zip
+        └── ReadMe/{data_description_glaucoma.txt, data_summary_glaucoma.csv}
+```
+
+The cache only contains the **zipped** archives, so they have to be extracted
+before training. Because the Hub cache is owned by another user and is read-only
+for this account, the extracted copy lives in a folder you own
+(`/home/jupyter-vshein/data/harvard/FairVision/`), which is exactly what the
+`DATASET_DIR` default points at.
+
+To download the dataset on a brand new machine:
+
+```bash
+hf download harvardairobotics/FairVision --repo-type dataset
+# older clients: huggingface-cli download harvardairobotics/FairVision --repo-type dataset
+```
+
+### 2.2 Extract the archive(s)
+
+Use the helper script — it finds the snapshot automatically, extracts the
+requested disease(s) and creates the folder names that the code expects:
+
+```bash
+./scripts/prepare_data.sh DR            # only DR (the default)
+./scripts/prepare_data.sh "AMD DR"      # several diseases in one go
+```
+
+If the cache lives elsewhere, set `HF_CACHE`; to extract into a different folder,
+set `DATA_ROOT`:
+
+```bash
+HF_CACHE=/path/to/.cache/huggingface \
+DATA_ROOT=/path/to/FairVision \
+./scripts/prepare_data.sh DR
+```
+
+### 2.3 Resulting layout
+
+```text
+/home/jupyter-vshein/data/harvard/FairVision/
+└── DR/
+    ├── Training/            # extracted from dataset.zip
+    ├── Validation/
+    ├── Test/
+    ├── train -> Training    # lowercase aliases required by src/data_handler.py
+    ├── val   -> Validation
+    ├── test  -> Test
+    └── data_summary_dr.csv
+```
+
+`src/data_handler.py` reads `<DATA_ROOT>/<DISEASE>/train|val|test` and only loads
+the `*.npz` files (`data_xxxxx.npz`). The `slo_xxxxx.jpg` files are provided for
+visual inspection and are not read by the training loop.
+
+---
+
+## 3. Experiments
+
+Run every command from the repository root. Each run writes its log,
+`args_train.txt`, the best checkpoints (`model_best_epoch*.pth`) and
+`pred_gt_best_epoch*.npz` into `--result_dir` (by default `./results/<name>/`),
+and appends one summary row per run to `./results/best_<perf_file>.csv`.
+
+### Step 1 — Baseline ViT-B on DR with SLO fundus images
+
+```bash
+./scripts/train_dr_vit.sh
+```
+
+* `ViT-B/16` initialised from ImageNet weights, 224×224 SLO fundus images,
+  BCE loss for vision-threatening DR (label 1 = severe NPDR / PDR).
+* 50 epochs, batch size 64, base LR `5e-4`, 5 warm-up epochs, layer-wise LR
+  decay `0.55`, stochastic depth `0.1`.
+* Fairness is reported for the `race`, `gender` and `hispanic` attributes.
+* Outputs: `./results/DR_ViT-B_slo_fundus_race/` and
+  `./results/best_DR_ViT-B_slo_fundus_race.csv`.
+
+Quick smoke test (1 epoch on 1 % of the training data) to check that data,
+model and pretrained weights all load correctly:
+
+```bash
+python scripts/train_dr_fair.py \
+    --epochs 1 --dataset_proportion 0.02 --batch_size 32 --workers 8 \
+    --data_dir /home/jupyter-vshein/data/harvard/FairVision/DR/ \
+    --result_dir ./results/smoke_dr --model_type ViT-B \
+    --modality_types slo_fundus --vit_weights imagenet --attribute_type race
+```
+
+### Step 2 — ViT-B + Fair Identity Scaling (FIS) on DR
+
+```bash
+./scripts/train_dr_vit_fis.sh
+```
+
+Same configuration as Step 1 with the proposed FIS loss enabled
+(`--fair_scaling_coef 0.5`, Sinkhorn blur `0.1`, temperature `1.0`).
+
+### Step 3 — Baseline 3D ResNet on DR with OCT B-scans
+
+```bash
+./scripts/train_dr_3d.sh
+```
+
+3D ResNet-18 (`--conv_type Conv3d`) on OCT volumes (`--image_size 200`),
+batch size 2.
+
+### Step 4 — 3D ResNet + FIS on DR with OCT B-scans
+
+```bash
+./scripts/train_dr_3d_fis.sh
+```
+
+### Running the same four steps on AMD
+
+```bash
+./scripts/train_amd_vit.sh       # Step 1 on AMD
+./scripts/train_amd_vit_fis.sh   # Step 2 on AMD
+./scripts/train_amd_3d.sh        # Step 3 on AMD
+./scripts/train_amd_3d_fis.sh    # Step 4 on AMD
+```
+
+### Running the same four steps on Glaucoma
+
+Extract the archive first (`./scripts/prepare_data.sh Glaucoma`), then copy one
+of the `train_dr_*.sh` scripts and replace `DR` with `Glaucoma` and
+`train_dr_fair*` with `train_glaucoma_fair*`.
+
+### Command-line options worth knowing
+
+| Flag | Meaning |
+| --- | --- |
+| `--data_dir` | folder containing `train/`, `val/`, `test/` for one disease |
+| `--attribute_type` | protected attribute to evaluate: `race`, `gender`, `hispanic` |
+| `--model_type` | `ViT-B`, `vit`, `resnet`, `convnext`, … |
+| `--modality_types` | `slo_fundus` (2D) or `oct_bscans` / `oct_bscans_3d` (3D) |
+| `--dataset_proportion` | fraction of the training set to use (smoke tests) |
+| `--workers` | number of DataLoader worker processes |
+| `--seed` | random seed; the result folder is renamed to include the seed |
+
+---
+
+## 4. Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `FileNotFoundError: .../DR/train` | The archive was not extracted or the lowercase aliases are missing — run `./scripts/prepare_data.sh DR`. |
+| `CUDA out of memory` | Lower `--batch_size` (ViT-B) or `--fair_scaling_batchsize` (3D / FIS). |
+| Downloading the ImageNet weights fails | Use `--vit_weights scratch`, or run once on a machine with internet access (timm caches the weights in `~/.cache/huggingface/`). |
+| `--vit_weights mae / mocov3 / mae_chest_xray / mae_color_fundus` fails | Those options expect pre-trained checkpoints under `/scratch/mok232/...` (see `scripts/train_dr_fair.py`). Download the checkpoints and update the paths, or use `imagenet` / `scratch`. |
+| `ImportError` / `ModuleNotFoundError` for a package | Re-run `pip install -r requirements.txt` and check that you run the scripts with the same interpreter (`python -c "import <package>"`). |
+| Training is extremely slow | Check `python -c "import torch; print(torch.cuda.is_available())"`. If it prints `False`, no GPU is visible and everything runs on the CPU. |
+| `unzip: command not found` | Use `python -m zipfile -e <archive> <target>` instead, or install `unzip` without `sudo` via `conda install -c conda-forge unzip`. |
+
+---
 
 ## Acknowledgment and Citation
 

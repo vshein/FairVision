@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Experiment outputs produced by scripts/train_*.sh
+results/
+
 # C extensions
 *.so
 

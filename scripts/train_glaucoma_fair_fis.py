@@ -230,7 +230,8 @@ def train(model, criterion, optimizer, scaler, train_dataset_loader, epoch, tota
     acc = accuracy(preds, gts, topk=(1,))
 
 
-    torch.cuda.synchronize()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     t2 = time.time()
 
     print(f"train ====> epcoh {epoch} loss: {np.mean(loss_batch):.4f} auc: {cur_auc:.4f} time: {t2 - t1:.4f}")

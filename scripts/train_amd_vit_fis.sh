@@ -1,5 +1,5 @@
 #!/bin/bash
-DATASET_DIR=/shared/ssd_30T/luoy/project/python/datasets/harvard/FairVision/
+DATASET_DIR=${DATASET_DIR:-/home/jupyter-vshein/data/harvard/FairVision/}
 RESULT_DIR=.
 MODEL_TYPE=( ViT-B ) # Options: efficientnet | vit | resnet | swin | vgg | resnext | wideresnet | efficientnetv1 | convnext
 MODALITY_TYPE='slo_fundus' # Options: 'oct_bscans_3d' | 'slo_fundus'

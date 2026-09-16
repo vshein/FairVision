@@ -1,13 +1,17 @@
 #!/bin/bash
+# 3D ResNet + Fair Identity Scaling (FIS) experiment on the DR task with OCT B-scans.
+# Usage:  ./scripts/train_dr_3d_fis.sh
+# Override the dataset location if needed:  DATASET_DIR=/path/to/FairVision ./scripts/train_dr_3d_fis.sh
 DATASET_DIR=${DATASET_DIR:-/home/jupyter-vshein/data/harvard/FairVision/}
-RESULT_DIR=.
+RESULT_DIR=${RESULT_DIR:-.}
 
 LR=5e-5
-NUM_EPOCH=50 
+NUM_EPOCH=50
 BATCH_SIZE=2
 MODALITY_TYPE='oct_bscans_3d'
 ATTRIBUTE_TYPE=( race gender hispanic ) # race|gender|hispanic
-EXPR=train_predictor_amd
+TASK=cls
+LOSS_TYPE=bce
 
 MODEL_TYPE=resnet18
 CONV_TYPE=Conv3d
@@ -17,11 +21,10 @@ SCALE_BLUR=.1
 SCALE_TEMP=10.
 SCALE_BZ=6
 
-
 PERF_FILE=${MODEL_TYPE}_${MODALITY_TYPE}_${ATTRIBUTE_TYPE}_3D_fis.csv
-python ./scripts/train_amd_3d_fair_fis.py \
-		--data_dir ${DATASET_DIR}/AMD/ \
-		--result_dir ${RESULT_DIR}/results_3D/amd_fis_${MODALITY_TYPE}_${ATTRIBUTE_TYPE}_${MODEL_TYPE}_${CONV_TYPE}_3D_lr${LR}_temp${SCALE_TEMP} \
+python ./scripts/train_dr_fair_3d_fis.py \
+		--data_dir ${DATASET_DIR}/DR/ \
+		--result_dir ${RESULT_DIR}/results_3D/dr_fis_${MODALITY_TYPE}_${ATTRIBUTE_TYPE}_${MODEL_TYPE}_${CONV_TYPE}_3D_lr${LR}_temp${SCALE_TEMP} \
 		--model_type ${MODEL_TYPE} \
 		--image_size 200 \
 		--loss_type ${LOSS_TYPE} \
@@ -32,7 +35,7 @@ python ./scripts/train_amd_3d_fair_fis.py \
 		--modality_types ${MODALITY_TYPE} \
 		--perf_file ${PERF_FILE} \
 		--attribute_type ${ATTRIBUTE_TYPE} \
-        --conv_type ${CONV_TYPE} \
+		--conv_type ${CONV_TYPE} \
 		--fair_scaling_coef ${SCALE_COEF} \
 		--fair_scaling_sinkhorn_blur ${SCALE_BLUR} \
 		--fair_scaling_temperature ${SCALE_TEMP} \

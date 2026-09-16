@@ -242,9 +242,10 @@ def train(model, criterion, optimizer, scaler, train_dataset_loader, epoch, tota
     if num_classes == 2:
         acc = accuracy(preds, gts, topk=(1,))
     elif num_classes > 2:
-        acc = accuracy(torch.from_numpy(preds).cuda(), torch.from_numpy(gts).cuda(), topk=(1,))
+        acc = accuracy(torch.from_numpy(preds).to(device), torch.from_numpy(gts).to(device), topk=(1,))
 
-    torch.cuda.synchronize()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     t2 = time.time()
 
     print(f"train ====> epcoh {epoch} loss: {np.mean(loss_batch):.4f} auc: {cur_auc:.4f} time: {t2 - t1:.4f}")
@@ -318,7 +319,7 @@ def validation(model, criterion, optimizer, validation_dataset_loader, epoch, re
     if num_classes == 2:
         acc = accuracy(preds, gts, topk=(1,))
     elif num_classes > 2:
-        acc = accuracy(torch.from_numpy(preds).cuda(), torch.from_numpy(gts).cuda(), topk=(1,))
+        acc = accuracy(torch.from_numpy(preds).to(device), torch.from_numpy(gts).to(device), topk=(1,))
 
     print(f"test <==== epcoh {epoch} loss: {np.mean(loss_batch):.4f} auc: {cur_auc:.4f}")
 

@@ -56,6 +56,16 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
         return outcome
 
+    # `forward_features` above already applies pooling + `fc_norm` and returns
+    # the feature vector that `self.head` expects. Newer timm releases changed
+    # `VisionTransformer.forward()` to call `forward_head()`, which would pool
+    # and normalise the features a second time, so we run the head directly
+    # (this matches the original MAE/timm-0.5 behaviour).
+    def forward(self, x):
+        x = self.forward_features(x)
+        x = self.head(x)
+        return x
+
 
 def vit_base_patch16(**kwargs):
     model = VisionTransformer(
