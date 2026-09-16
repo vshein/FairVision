@@ -255,8 +255,9 @@ somewhere other than `<repo>/results/`.
 
 ### 1.5 Compatibility notes for this checkout
 
-Three small fixes were needed so that the (2024) code base runs with the current
-PyTorch/timm releases — all of them are already applied in this repository:
+Five small fixes were needed so that the (2024) code base runs on a current
+PyTorch/timm installation and on any machine — all of them are already applied
+in this repository, so a fresh `git clone` needs nothing but `pip install`:
 
 1. `scripts/models_vit.py` — the vendored MAE `VisionTransformer` inherits the
    modern timm class, whose `forward()` calls `forward_head()`, pooling and
@@ -269,6 +270,16 @@ PyTorch/timm releases — all of them are already applied in this repository:
 3. All `scripts/train_*.py` — `torch.cuda.synchronize()` is now wrapped in
    `if torch.cuda.is_available():` and the hard-coded `.cuda()` calls use the
    `device` variable, so the code also runs (slowly) on a CPU-only machine.
+4. All `scripts/train_*.py` — the dataset folder is resolved relative to the
+   repository (`<repo>/data`) instead of the authors' cluster path, and can be
+   overridden with `DATASET_DIR`; the same applies to the optional
+   `--vit_weights mae/…` checkpoints via `MODELHUB_DIR`. **Never edit a path in
+   the source.**
+5. All `scripts/train_*.py` — if a DataLoader produces no batch at all (e.g.
+   `--dataset_proportion` so small that the subset cannot fill one batch), the
+   code now raises a descriptive `RuntimeError` instead of
+   `ValueError: need at least one array to concatenate`. For the smoke test use
+   `--dataset_proportion 0.02`, not smaller.
 
 ---
 
@@ -379,8 +390,8 @@ and appends one summary row per run to `./results/best_<perf_file>.csv`.
 * Outputs: `./results/DR_ViT-B_slo_fundus_race/` and
   `./results/best_DR_ViT-B_slo_fundus_race.csv`.
 
-Quick smoke test (1 epoch on 1 % of the training data) to check that data,
-model and pretrained weights all load correctly:
+Quick smoke test (1 epoch on 2 % of the training data, ~5 min on a GPU-less
+machine) to check that data, model and pretrained weights all load correctly:
 
 ```bash
 python scripts/train_dr_fair.py \
@@ -447,7 +458,8 @@ of the `train_dr_*.sh` scripts and replace `DR` with `Glaucoma` and
 
 | Symptom | Fix |
 | --- | --- |
-| `FileNotFoundError: .../DR/train` | The archive was not extracted yet — run `./scripts/prepare_data.sh DR`. |
+| `FileNotFoundError: .../DR/train` | The archive was not extracted yet — run `./scripts/prepare_data.sh DR`, or point `DATASET_DIR` at the folder that contains `DR/`. |
+| `RuntimeError: No samples were loaded` | `--dataset_proportion` is too small for the sampled subset to fill one batch. Use `0.02` for smoke tests (or leave it unset to use the whole training set). |
 | `CUDA out of memory` | Lower `--batch_size` (ViT-B) or `--fair_scaling_batchsize` (3D / FIS). |
 | Downloading the ImageNet weights fails | Use `--vit_weights scratch`, or run once on a machine with internet access (timm caches the weights in `~/.cache/huggingface/`). |
 | `--vit_weights mae / mocov3 / mae_chest_xray / mae_color_fundus` fails | Those options expect pre-trained checkpoints in the authors' model hub folder. Put the `.pth` files in a folder of your own and point the code at it with the `MODELHUB_DIR` environment variable: `MODELHUB_DIR=/path/to/MODELHUB ./scripts/train_dr_vit.sh` (defaults to the original `/scratch/mok232/...` path, so nothing breaks if you never use these options). Alternatively use `imagenet` or `scratch`. |

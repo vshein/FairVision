@@ -233,6 +233,14 @@ def train(model, criterion, optimizer, scaler, train_dataset_loader, epoch, tota
         optimizer.zero_grad()
 
 
+    if len(preds) == 0:
+        raise RuntimeError(
+            "No samples were loaded, so there is nothing to evaluate. This usually "
+            "means --dataset_proportion is too small (the sampled subset did not fill "
+            "even one batch) or --data_dir points to an empty folder. Try a larger "
+            "value, e.g. --dataset_proportion 0.02."
+        )
+
     preds = np.concatenate(preds, axis=0)
     gts = np.concatenate(gts, axis=0)
     attrs = np.concatenate(attrs, axis=1).astype(int)
@@ -308,6 +316,14 @@ def validation(model, criterion, optimizer, validation_dataset_loader, epoch, re
             top1_accuracy_batch.append(top1_accuracy)
         
     loss = np.mean(loss_batch)
+
+    if len(preds) == 0:
+        raise RuntimeError(
+            "No samples were loaded, so there is nothing to evaluate. This usually "
+            "means --dataset_proportion is too small (the sampled subset did not fill "
+            "even one batch) or --data_dir points to an empty folder. Try a larger "
+            "value, e.g. --dataset_proportion 0.02."
+        )
 
     preds = np.concatenate(preds, axis=0)
     gts = np.concatenate(gts, axis=0)
