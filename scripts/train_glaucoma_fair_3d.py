@@ -319,9 +319,9 @@ if __name__ == '__main__':
     eval_transform = Transform3D(mul='0.5') if args.shape_transform else Transform3D()
     
     
-    train_havo_dataset = FairVision_Glaucoma(os.path.join(args.data_dir, 'train'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, attribute_type=args.attribute_type, needBalance=args.need_balance, transform=train_transform, dataset_proportion=args.dataset_proportion)
-    val_havo_dataset = FairVision_Glaucoma(os.path.join(args.data_dir, 'val'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, transform=eval_transform, attribute_type=args.attribute_type)
-    test_havo_dataset = FairVision_Glaucoma(os.path.join(args.data_dir, 'test'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, transform=eval_transform, attribute_type=args.attribute_type)
+    train_havo_dataset = FairVision_Glaucoma(resolve_split_dir(args.data_dir, 'train'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, attribute_type=args.attribute_type, needBalance=args.need_balance, transform=train_transform, dataset_proportion=args.dataset_proportion)
+    val_havo_dataset = FairVision_Glaucoma(resolve_split_dir(args.data_dir, 'val'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, transform=eval_transform, attribute_type=args.attribute_type)
+    test_havo_dataset = FairVision_Glaucoma(resolve_split_dir(args.data_dir, 'test'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, transform=eval_transform, attribute_type=args.attribute_type)
 
     # args.num_classes = int(np.max(list(train_havo_dataset.disease_mapping.values())))+1
     logger.log(f'there are {args.num_classes} classes in total')

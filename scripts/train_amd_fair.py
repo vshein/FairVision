@@ -302,9 +302,9 @@ if __name__ == '__main__':
     if args.model_type == 'vit' or args.model_type == 'swin' or args.model_type == 'ViT-B' or args.model_type == 'VideoMAE' or args.model_type == 'ViViT':
         args.image_size = 224
 
-    train_havo_dataset = FairVision_AMD(os.path.join(args.data_dir, 'train'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, attribute_type=args.attribute_type, needBalance=args.need_balance, dataset_proportion=args.dataset_proportion)
-    val_havo_dataset = FairVision_AMD(os.path.join(args.data_dir, 'val'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, attribute_type=args.attribute_type)
-    test_havo_dataset = FairVision_AMD(os.path.join(args.data_dir, 'test'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, attribute_type=args.attribute_type)
+    train_havo_dataset = FairVision_AMD(resolve_split_dir(args.data_dir, 'train'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, attribute_type=args.attribute_type, needBalance=args.need_balance, dataset_proportion=args.dataset_proportion)
+    val_havo_dataset = FairVision_AMD(resolve_split_dir(args.data_dir, 'val'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, attribute_type=args.attribute_type)
+    test_havo_dataset = FairVision_AMD(resolve_split_dir(args.data_dir, 'test'), modality_type=args.modality_types, task=args.task, resolution=args.image_size, attribute_type=args.attribute_type)
 
     args.num_classes = int(np.max(list(train_havo_dataset.disease_mapping.values())))+1
     logger.log(f'there are {args.num_classes} classes in total')

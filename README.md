@@ -2,6 +2,35 @@
 
 The code and dataset for the paper entitled [**FairVision: Equitable Deep Learning for Eye Disease Screening via Fair Identity Scaling**](https://arxiv.org/pdf/2310.02492). Note that, the modifier word “Harvard” only indicates that our dataset is from the Department of Ophthalmology of Harvard Medical School and does not imply an endorsement, sponsorship, or assumption of responsibility by either Harvard University or Harvard Medical School as a legal identity.
 
+## Quick start
+
+```bash
+git clone https://github.com/vshein/FairVision.git
+cd FairVision
+pip install -r requirements.txt          # all dependencies, no sudo needed
+./scripts/prepare_data.sh DR            # extracts the DR archive into ./data
+./scripts/train_dr_vit.sh               # Step 1: baseline ViT-B on DR
+```
+
+Nothing else has to be configured: `prepare_data.sh` looks for the already
+downloaded Hugging Face dataset in the cache (your own, or another user's that
+you can read), extracts it into the repository's `data/` folder, and every
+training script reads that folder by default. If the dataset has never been
+downloaded on this machine, run
+`hf download harvardairobotics/FairVision --repo-type dataset` first (see
+[§2](#2-preparing-the-data)).
+
+**Already have the data extracted?** Then skip `prepare_data.sh` entirely and
+just tell the scripts where it is — one environment variable, no file editing:
+
+```bash
+DATASET_DIR=/path/to/FairVision ./scripts/train_dr_vit.sh
+```
+
+Never edit a path inside the scripts. `DATASET_DIR` (dataset) and `RESULT_DIR`
+(outputs) are the only two knobs, and both have sensible defaults — see
+[§1.4](#14-point-the-code-at-the-data) for all the supported layouts.
+
 ## Dataset
 
 The dataset Harvard-FairVision can be accessed via this [link](https://huggingface.co/datasets/harvardairobotics/FairGenMed). This dataset can only be used for non-commercial research purposes. At no time, the dataset shall be used for clinical decisions or patient care. The data use license is [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). If you have any questions, please email <harvardophai@gmail.com> and <harvardairobotics@gmail.com>.
@@ -102,6 +131,7 @@ Equity in AI for healthcare is crucial due to its direct impact on human well-be
 
 ## Table of contents
 
+0. [Quick start](#quick-start)
 1. [Environment setup](#1-environment-setup)
 2. [Preparing the data](#2-preparing-the-data)
 3. [Experiments (step by step)](#3-experiments)
@@ -167,17 +197,59 @@ The experiments themselves are started with the same interpreter that printed
 ### 1.4 Point the code at the data
 
 Every script in `scripts/` reads the dataset root from the `DATASET_DIR`
-environment variable. The default used in this checkout is
+environment variable. If it is **not** set (the normal case), the scripts use
 
 ```text
-/home/jupyter-vshein/data/harvard/FairVision/
+<repository>/data/
 ```
 
-and can be overridden per run (keep the trailing slash):
+i.e. the folder that `scripts/prepare_data.sh` fills in. Because the scripts
+resolve this relative to their own location, a fresh clone runs with **no path
+edits at all** — you never have to edit a script or a Python file.
+
+There are three situations; pick the one that matches your machine.
+
+**(a) You are starting from scratch (only the Hugging Face cache exists).**
+Do nothing — follow [Quick start](#quick-start) / [§2](#2-preparing-the-data):
 
 ```bash
-DATASET_DIR=/path/to/FairVision/ ./scripts/train_dr_vit.sh
+./scripts/prepare_data.sh DR     # extracts the cache into <repo>/data/DR
+./scripts/train_dr_vit.sh        # reads <repo>/data/DR automatically
 ```
+
+**(b) The dataset is already extracted somewhere on this machine** (for example
+`/home/jupyter-kl3nguye/.cache/huggingface/...` still holds the archives, or you
+find a folder that already contains `DR/Training`, `DR/Validation`, `DR/Test`).
+There are two ways to use it, both without editing any file:
+
+```bash
+# Option 1 — point the scripts at it for this command only:
+DATASET_DIR=/home/jupyter-vshein/data/harvard/FairVision ./scripts/train_dr_vit.sh
+
+# Option 2 — make it permanent by symlinking it into the repository.
+#            (`data/` is in .gitignore, so the symlink stays local.)
+ln -s /home/jupyter-vshein/data/harvard/FairVision data
+./scripts/train_dr_vit.sh
+```
+
+**(c) The data lives on another account** (e.g. the archives were downloaded by
+`jupyter-kl3nguye` and you are `jupyter-vshein`). If the archives are readable
+they can be extracted with
+
+```bash
+./scripts/prepare_data.sh DR /home/jupyter-kl3nguye/.cache/huggingface/hub/datasets--harvardairobotics--FairVision/snapshots/<revision>
+```
+
+which writes the extracted copy into **your** `<repo>/data/` — no `sudo`, no
+ownership problems. Do not try to extract in place: another user's cache is
+normally read-only.
+
+The folder you pass to `DATASET_DIR` must be the one that *contains* the
+disease folders, so that `DATASET_DIR/DR/train` (or `DATASET_DIR/DR/Training`)
+resolves. Either spelling of the split names works.
+
+`train_*.sh` also honours `RESULT_DIR` if you want the logs and checkpoints
+somewhere other than `<repo>/results/`.
 
 ### 1.5 Compatibility notes for this checkout
 
@@ -204,10 +276,12 @@ PyTorch/timm releases — all of them are already applied in this repository:
 
 The dataset is published on Hugging Face as
 [`harvardairobotics/FairVision`](https://huggingface.co/datasets/harvardairobotics/FairVision).
-On this machine it is already downloaded into the Hugging Face cache:
+If it was downloaded before (for example by the `hf download` command below, or
+by the account that owns the data), it sits in that account's Hugging Face cache
+as one archive per disease:
 
 ```text
-/home/jupyter-kl3nguye/.cache/huggingface/hub/datasets--harvardairobotics--FairVision/
+<$HF_HOME or ~/.cache/huggingface>/hub/datasets--harvardairobotics--FairVision/
 └── snapshots/<revision>/
     ├── AMD/
     │   ├── Dataset/dataset.zip          # ~40 GB archive: NPZ files + SLO jpgs
@@ -220,55 +294,65 @@ On this machine it is already downloaded into the Hugging Face cache:
         └── ReadMe/{data_description_glaucoma.txt, data_summary_glaucoma.csv}
 ```
 
-The cache only contains the **zipped** archives, so they have to be extracted
-before training. Because the Hub cache is owned by another user and is read-only
-for this account, the extracted copy lives in a folder you own
-(`/home/jupyter-vshein/data/harvard/FairVision/`), which is exactly what the
-`DATASET_DIR` default points at.
+The cache only holds the **zipped** archives, so they have to be extracted
+before training — that is what `prepare_data.sh` does in the next step.
 
-To download the dataset on a brand new machine:
+If the dataset has never been downloaded on this machine:
 
 ```bash
 hf download harvardairobotics/FairVision --repo-type dataset
 # older clients: huggingface-cli download harvardairobotics/FairVision --repo-type dataset
 ```
 
-### 2.2 Extract the archive(s)
+You only need to download/extract the disease(s) you plan to train on
+(`AMD`, `DR` and/or `Glaucoma`).
 
-Use the helper script — it finds the snapshot automatically, extracts the
-requested disease(s) and creates the folder names that the code expects:
+### 2.2 Extract the archive(s)
 
 ```bash
 ./scripts/prepare_data.sh DR            # only DR (the default)
 ./scripts/prepare_data.sh "AMD DR"      # several diseases in one go
 ```
 
-If the cache lives elsewhere, set `HF_CACHE`; to extract into a different folder,
-set `DATA_ROOT`:
+The script:
+
+* searches your own Hugging Face cache (`$HF_CACHE`, `$HF_HOME`,
+  `~/.cache/huggingface`, then any `/home/*/.cache/huggingface`) for the
+  snapshot — run it as the user who downloaded the data and no argument is
+  needed;
+* extracts into `<repo>/data` (skipped automatically if the data is already
+  there, so it is safe to re-run);
+* adds the lowercase `train` / `val` / `test` aliases next to the archive's
+  `Training` / `Validation` / `Test` folders;
+* copies `data_summary_<disease>.csv` next to them (race, gender, ethnicity,
+  age, preferred language, marital status).
+
+Overrides, if needed:
 
 ```bash
-HF_CACHE=/path/to/.cache/huggingface \
-DATA_ROOT=/path/to/FairVision \
+HF_CACHE=/path/to/.cache/huggingface \   # where the download lives
+DATA_ROOT=/path/to/extract          \   # where to put the extracted data
 ./scripts/prepare_data.sh DR
 ```
 
 ### 2.3 Resulting layout
 
 ```text
-/home/jupyter-vshein/data/harvard/FairVision/
+<repo>/data/
 └── DR/
     ├── Training/            # extracted from dataset.zip
     ├── Validation/
     ├── Test/
-    ├── train -> Training    # lowercase aliases required by src/data_handler.py
+    ├── train -> Training    # convenience aliases
     ├── val   -> Validation
     ├── test  -> Test
     └── data_summary_dr.csv
 ```
 
-`src/data_handler.py` reads `<DATA_ROOT>/<DISEASE>/train|val|test` and only loads
-the `*.npz` files (`data_xxxxx.npz`). The `slo_xxxxx.jpg` files are provided for
-visual inspection and are not read by the training loop.
+The loader (`src/data_handler.py`) accepts either spelling — `Training` /
+`Validation` / `Test` work just as well as `train` / `val` / `test` — and only
+reads the `*.npz` files (`data_xxxxx.npz`). The `slo_xxxxx.jpg` files are
+provided for visual inspection and are not read by the training loop.
 
 ---
 
@@ -299,7 +383,7 @@ model and pretrained weights all load correctly:
 ```bash
 python scripts/train_dr_fair.py \
     --epochs 1 --dataset_proportion 0.02 --batch_size 32 --workers 8 \
-    --data_dir /home/jupyter-vshein/data/harvard/FairVision/DR/ \
+    --data_dir data/DR/ \
     --result_dir ./results/smoke_dr --model_type ViT-B \
     --modality_types slo_fundus --vit_weights imagenet --attribute_type race
 ```
@@ -361,7 +445,7 @@ of the `train_dr_*.sh` scripts and replace `DR` with `Glaucoma` and
 
 | Symptom | Fix |
 | --- | --- |
-| `FileNotFoundError: .../DR/train` | The archive was not extracted or the lowercase aliases are missing — run `./scripts/prepare_data.sh DR`. |
+| `FileNotFoundError: .../DR/train` | The archive was not extracted yet — run `./scripts/prepare_data.sh DR`. |
 | `CUDA out of memory` | Lower `--batch_size` (ViT-B) or `--fair_scaling_batchsize` (3D / FIS). |
 | Downloading the ImageNet weights fails | Use `--vit_weights scratch`, or run once on a machine with internet access (timm caches the weights in `~/.cache/huggingface/`). |
 | `--vit_weights mae / mocov3 / mae_chest_xray / mae_color_fundus` fails | Those options expect pre-trained checkpoints under `/scratch/mok232/...` (see `scripts/train_dr_fair.py`). Download the checkpoints and update the paths, or use `imagenet` / `scratch`. |

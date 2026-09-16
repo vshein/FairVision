@@ -19,16 +19,20 @@
 #   ./scripts/prepare_data.sh "AMD DR Glaucoma"
 #   ./scripts/prepare_data.sh DR /path/to/snapshot   # explicit snapshot folder
 #
+# By default the data is extracted into "<repo>/data", which is exactly where
+# the training scripts look for it, so there is nothing else to configure.
+#
 # Environment overrides:
-#   DATA_ROOT  Where data is extracted  (default: /home/jupyter-vshein/data/harvard/FairVision)
+#   DATA_ROOT  Where data is extracted (default: <repo>/data)
 #   HF_CACHE / HF_HOME  Hugging Face cache root (default: $HOME/.cache/huggingface,
 #                       falling back to /home/*/.cache/huggingface)
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DISEASES=${1:-DR}
 SNAP_ARG=${2:-}
-DATA_ROOT=${DATA_ROOT:-/home/jupyter-vshein/data/harvard/FairVision}
+DATA_ROOT=${DATA_ROOT:-${REPO_ROOT}/data}
 
 # Locate the downloaded snapshot: an explicit argument wins, then $HF_CACHE,
 # then the usual Hugging Face cache locations (including other users' caches).
@@ -75,29 +79,39 @@ mkdir -p "${DATA_ROOT}"
 
 for DISEASE in ${DISEASES}; do
     ZIP="${SNAP}${DISEASE}/Dataset/dataset.zip"
-    if [ ! -f "${ZIP}" ]; then
+    DEST="${DATA_ROOT}/${DISEASE}"
+    mkdir -p "${DEST}"
+
+    if [ -d "${DEST}/train" ] || [ -d "${DEST}/Training" ]; then
+        echo "==> ${DISEASE}: data already present in ${DEST}, skipping extraction."
+    elif [ ! -f "${ZIP}" ]; then
         echo "WARNING: ${ZIP} not found, skipping ${DISEASE}." >&2
         continue
+    else
+        echo "==> Extracting ${DISEASE} to ${DEST} ..."
+        # -n: never overwrite existing files, so the script can be re-run/resumed cheaply.
+        unzip -q -n "${ZIP}" -x '__MACOSX/*' -d "${DEST}"
     fi
 
-    echo "==> Extracting ${DISEASE} to ${DATA_ROOT}/${DISEASE} ..."
-    mkdir -p "${DATA_ROOT}/${DISEASE}"
-    # -n: never overwrite existing files, so the script can be re-run/resumed cheaply.
-    unzip -q -n "${ZIP}" -x '__MACOSX/*' -d "${DATA_ROOT}/${DISEASE}"
-
-    # The code reads <DISEASE>/train, <DISEASE>/val and <DISEASE>/test.
-    ln -sfn Training   "${DATA_ROOT}/${DISEASE}/train"
-    ln -sfn Validation "${DATA_ROOT}/${DISEASE}/val"
-    ln -sfn Test       "${DATA_ROOT}/${DISEASE}/test"
+    # The loader (src/data_handler.resolve_split_dir) already understands the
+    # Training/Validation/Test names; these aliases just keep the layout uniform.
+    if [ -d "${DEST}/Training" ];   then ln -sfn Training   "${DEST}/train"; fi
+    if [ -d "${DEST}/Validation" ]; then ln -sfn Validation "${DEST}/val";   fi
+    if [ -d "${DEST}/Test" ];       then ln -sfn Test       "${DEST}/test";  fi
 
     # Copy the per-disease metadata csv (race / gender / ethnicity / age / ...).
     LOWER=$(echo "${DISEASE}" | tr '[:upper:]' '[:lower:]')
     SUMMARY="${SNAP}${DISEASE}/ReadMe/data_summary_${LOWER}.csv"
-    [ -f "${SUMMARY}" ] && cp -f "${SUMMARY}" "${DATA_ROOT}/${DISEASE}/"
+    if [ -f "${SUMMARY}" ]; then cp -f "${SUMMARY}" "${DEST}/"; fi
 
-    echo "    done: $(ls -d "${DATA_ROOT}/${DISEASE}"/*/ | tr '\n' ' ')"
+    echo "    ${DISEASE} is ready:"
+    for SPLIT in train val test; do
+        if [ -d "${DEST}/${SPLIT}" ]; then
+            echo "      ${SPLIT}: $(ls -1 "${DEST}/${SPLIT}"/*.npz 2>/dev/null | wc -l) npz files"
+        fi
+    done
 done
 
 echo
 echo "Data is ready under ${DATA_ROOT}"
-echo "Run the experiments with:  DATASET_DIR=${DATA_ROOT}/ ./scripts/train_dr_vit.sh"
+echo "Start training with:  ./scripts/train_dr_vit.sh"

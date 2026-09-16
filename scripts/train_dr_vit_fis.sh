@@ -2,7 +2,9 @@
 # ViT-B + Fair Identity Scaling (FIS) experiment on the DR task with SLO fundus images.
 # Usage:  ./scripts/train_dr_vit_fis.sh
 # Override the dataset location if needed:  DATASET_DIR=/path/to/FairVision ./scripts/train_dr_vit_fis.sh
-DATASET_DIR=${DATASET_DIR:-/home/jupyter-vshein/data/harvard/FairVision/}
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${REPO_ROOT}" || exit 1
+DATASET_DIR=${DATASET_DIR:-${REPO_ROOT}/data}
 RESULT_DIR=${RESULT_DIR:-.}
 MODEL_TYPE=( ViT-B ) # Options: efficientnet | vit | resnet | swin | vgg | resnext | wideresnet | efficientnetv1 | convnext
 MODALITY_TYPE='slo_fundus' # Options: 'oct_bscans_3d' | 'slo_fundus'

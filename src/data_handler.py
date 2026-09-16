@@ -24,6 +24,30 @@ def find_all_files_(folder, str_pattern='*.npz'):
     files = [os.path.basename(y) for x in os.walk(folder) for y in glob(os.path.join(x[0], str_pattern))]
     return files
 
+# The archives released on Hugging Face ship the splits as "Training" /
+# "Validation" / "Test", while the training scripts ask for the lowercase
+# "train" / "val" / "test". Both spellings (and the "valid"/"testing" variants)
+# are accepted so that a plain extraction works without renaming anything.
+SPLIT_ALIASES = {
+    'train': ('train', 'Train', 'training', 'Training'),
+    'val': ('val', 'Val', 'valid', 'Valid', 'validation', 'Validation'),
+    'test': ('test', 'Test', 'testing', 'Testing'),
+}
+
+def resolve_split_dir(data_dir, split):
+    """Return the folder holding one data split (e.g. <data_dir>/DR/train).
+
+    `split` may be 'train', 'val' or 'test'; the corresponding 'Training',
+    'Validation' or 'Test' folder is used when the lowercase one is absent.
+    """
+    for name in SPLIT_ALIASES.get(split, (split,)):
+        path = os.path.join(data_dir, name)
+        if os.path.isdir(path):
+            return path
+    # Nothing found: return the canonical name so the caller sees the usual
+    # (and easy to understand) "folder not found" error.
+    return os.path.join(data_dir, split)
+
 def get_all_pids(data_dir):
     pids = []
     dict_pid_fid = {}

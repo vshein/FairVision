@@ -6,6 +6,9 @@ __pycache__/
 # Experiment outputs produced by scripts/train_*.sh
 results/
 
+# Dataset extracted by scripts/prepare_data.sh (large, machine specific)
+data/
+
 # C extensions
 *.so
 

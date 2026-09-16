@@ -2,7 +2,9 @@
 # Baseline 3D ResNet experiment on the DR task with OCT B-scans.
 # Usage:  ./scripts/train_dr_3d.sh
 # Override the dataset location if needed:  DATASET_DIR=/path/to/FairVision ./scripts/train_dr_3d.sh
-DATASET_DIR=${DATASET_DIR:-/home/jupyter-vshein/data/harvard/FairVision/}
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${REPO_ROOT}" || exit 1
+DATASET_DIR=${DATASET_DIR:-${REPO_ROOT}/data}
 RESULT_DIR=${RESULT_DIR:-.}
 
 LR=5e-5

@@ -1,5 +1,10 @@
 #!/bin/bash
-DATASET_DIR=${DATASET_DIR:-/home/jupyter-vshein/data/harvard/FairVision/}
+# 3D ResNet + Fair Identity Scaling (FIS) experiment on the AMD task with OCT B-scans.
+# Usage:  ./scripts/train_amd_3d_fis.sh
+# Override the dataset location if needed:  DATASET_DIR=/path/to/FairVision ./scripts/train_amd_3d_fis.sh
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${REPO_ROOT}" || exit 1
+DATASET_DIR=${DATASET_DIR:-${REPO_ROOT}/data}
 RESULT_DIR=.
 
 LR=5e-5
@@ -7,6 +12,8 @@ NUM_EPOCH=50
 BATCH_SIZE=2
 MODALITY_TYPE='oct_bscans_3d'
 ATTRIBUTE_TYPE=( race gender hispanic ) # race|gender|hispanic
+TASK=cls
+LOSS_TYPE=bce
 EXPR=train_predictor_amd
 
 MODEL_TYPE=resnet18
